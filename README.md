@@ -1,5 +1,4 @@
 <div align="center">
-    <img src="./media/logo_small.webp"/>
     <h1>🌱 Spec Kit</h1>
     <h3><em>Build high-quality software faster.</em></h3>
 </div>
