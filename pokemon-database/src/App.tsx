@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { useUserStore } from './stores/userStore';
 import PokemonList from './components/PokemonList';
 import PokemonDetail from './components/PokemonDetail';
+import ComparisonTool from './components/ComparisonTool';
+import TeamBuilder from './components/TeamBuilder';
+import TypeEffectiveness from './components/TypeEffectiveness';
 import Header from './components/Header';
 import './index.css';
 
@@ -66,8 +69,9 @@ function App() {
               <Route path="/" element={<PokemonList />} />
               <Route path="/pokemon/:id" element={<PokemonDetail />} />
               <Route path="/favorites" element={<PokemonList favoritesOnly />} />
-              <Route path="/teams" element={<div>Teams Page (Coming Soon)</div>} />
-              <Route path="/compare" element={<div>Compare Page (Coming Soon)</div>} />
+              <Route path="/teams" element={<TeamBuilder />} />
+              <Route path="/compare" element={<ComparisonTool />} />
+              <Route path="/type-effectiveness" element={<TypeEffectiveness />} />
             </Routes>
           </main>
         </div>

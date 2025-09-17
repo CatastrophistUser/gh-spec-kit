@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useUserStore } from '../stores/userStore';
-import { Moon, Sun, Heart, Users, BarChart3, Search } from 'lucide-react';
+import { Moon, Sun, Heart, Users, BarChart3, Search, Zap } from 'lucide-react';
 
 export default function Header() {
   const location = useLocation();
@@ -16,6 +16,7 @@ export default function Header() {
     { path: '/favorites', label: 'Favorites', icon: Heart },
     { path: '/teams', label: 'Teams', icon: Users },
     { path: '/compare', label: 'Compare', icon: BarChart3 },
+    { path: '/type-effectiveness', label: 'Type Chart', icon: Zap },
   ];
 
   return (

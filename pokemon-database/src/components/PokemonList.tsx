@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useInfinitePokemonList } from '../hooks/usePokemon';
+import { useState, useEffect, useMemo } from 'react';
+import { useInfinitePokemonList, useMultiplePokemon } from '../hooks/usePokemon';
 import { usePokemonStore } from '../stores/pokemonStore';
 import { useUserStore } from '../stores/userStore';
 import PokemonCard from './PokemonCard';
@@ -7,15 +7,17 @@ import SearchBar from './SearchBar';
 import FilterPanel from './FilterPanel';
 import LoadingSpinner from './LoadingSpinner';
 import ErrorMessage from './ErrorMessage';
+import type { Pokemon } from '../types';
 
 interface PokemonListProps {
   favoritesOnly?: boolean;
 }
 
 export default function PokemonList({ favoritesOnly = false }: PokemonListProps) {
-  const { pokemonList, setPokemonList, error, setError } = usePokemonStore();
+  const { pokemonList, setPokemonList, error, setError, filters } = usePokemonStore();
   const { favorites } = useUserStore();
   const [showFilters, setShowFilters] = useState(false);
+  const [showShiny, setShowShiny] = useState(false);
 
   const {
     data,
@@ -26,61 +28,26 @@ export default function PokemonList({ favoritesOnly = false }: PokemonListProps)
     error: queryError,
   } = useInfinitePokemonList(20);
 
-  // Update store when data changes
+  // Get Pokémon IDs from API results
+  const pokemonIds = useMemo(() => {
+    if (!data) return [];
+    return data.pages.flatMap((page: { results: Array<{ url: string }> }) => 
+      page.results.map((result: { url: string }) => {
+        const id = result.url.split('/').slice(-2, -1)[0];
+        return parseInt(id, 10);
+      })
+    );
+  }, [data]);
+
+  // Fetch detailed Pokémon data
+  const { data: detailedPokemon } = useMultiplePokemon(pokemonIds);
+
+  // Update store when detailed data changes
   useEffect(() => {
-    if (data) {
-      const allPokemon = data.pages.flatMap((page: any) => page.results);
-      // Convert API results to Pokemon objects (simplified for now)
-      const pokemonData = allPokemon.map((result, index) => ({
-        id: index + 1,
-        name: result.name,
-        height: 0,
-        weight: 0,
-        base_experience: 0,
-        order: index + 1,
-        is_default: true,
-        sprites: {
-          front_default: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${index + 1}.png`,
-          front_shiny: null,
-          front_female: null,
-          front_shiny_female: null,
-          back_default: null,
-          back_shiny: null,
-          back_female: null,
-          back_shiny_female: null,
-          other: {
-            'official-artwork': {
-              front_default: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${index + 1}.png`,
-              front_shiny: null,
-            },
-            dream_world: {
-              front_default: null,
-            },
-            home: {
-              front_default: null,
-              front_shiny: null,
-            },
-          },
-        },
-        types: [{ slot: 1, type: { name: 'normal', url: '' } }],
-        stats: [
-          { base_stat: 50, effort: 0, stat: { name: 'hp', url: '' } },
-          { base_stat: 50, effort: 0, stat: { name: 'attack', url: '' } },
-          { base_stat: 50, effort: 0, stat: { name: 'defense', url: '' } },
-          { base_stat: 50, effort: 0, stat: { name: 'special-attack', url: '' } },
-          { base_stat: 50, effort: 0, stat: { name: 'special-defense', url: '' } },
-          { base_stat: 50, effort: 0, stat: { name: 'speed', url: '' } },
-        ],
-        abilities: [],
-        moves: [],
-        species: {
-          name: result.name,
-          url: result.url,
-        },
-      }));
-      setPokemonList(pokemonData);
+    if (detailedPokemon && Array.isArray(detailedPokemon)) {
+      setPokemonList(detailedPokemon);
     }
-  }, [data, setPokemonList]);
+  }, [detailedPokemon, setPokemonList]);
 
   // Handle errors
   useEffect(() => {
@@ -95,13 +62,45 @@ export default function PokemonList({ favoritesOnly = false }: PokemonListProps)
     }
   };
 
-  // Filter Pokémon based on favorites if needed
-  const filteredPokemon = favoritesOnly 
-    ? pokemonList.filter(pokemon => favorites.pokemonIds.includes(pokemon.id))
-    : pokemonList;
+  // Filter Pokémon based on search, filters, and favorites
+  const filteredPokemon = useMemo(() => {
+    let filtered = pokemonList;
+
+    // Apply search filter
+    if (filters.search) {
+      const searchTerm = filters.search.toLowerCase();
+      filtered = filtered.filter(pokemon => 
+        pokemon.name.toLowerCase().includes(searchTerm) ||
+        pokemon.id.toString().includes(searchTerm)
+      );
+    }
+
+    // Apply type filters
+    if (filters.types.length > 0) {
+      filtered = filtered.filter(pokemon =>
+        pokemon.types.some(type => filters.types.includes(type.type.name))
+      );
+    }
+
+    // Apply BST filters
+    const totalBST = (pokemon: Pokemon) => pokemon.stats.reduce((sum, stat) => sum + stat.base_stat, 0);
+    if (filters.minBST > 0) {
+      filtered = filtered.filter(pokemon => totalBST(pokemon) >= filters.minBST);
+    }
+    if (filters.maxBST < 1000) {
+      filtered = filtered.filter(pokemon => totalBST(pokemon) <= filters.maxBST);
+    }
+
+    // Apply favorites filter
+    if (favoritesOnly) {
+      filtered = filtered.filter(pokemon => favorites.pokemonIds.includes(pokemon.id));
+    }
+
+    return filtered;
+  }, [pokemonList, filters, favoritesOnly, favorites.pokemonIds]);
 
   if (queryLoading && pokemonList.length === 0) {
-    return <LoadingSpinner />;
+    return <LoadingSpinner message="Loading Pokémon..." />;
   }
 
   if (error) {
@@ -115,12 +114,24 @@ export default function PokemonList({ favoritesOnly = false }: PokemonListProps)
         <div className="flex-1 max-w-md">
           <SearchBar />
         </div>
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-        >
-          {showFilters ? 'Hide Filters' : 'Show Filters'}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowShiny(!showShiny)}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+              showShiny 
+                ? 'bg-yellow-500 text-white' 
+                : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-yellow-500 hover:text-white'
+            }`}
+          >
+            {showShiny ? '★ Shiny' : '☆ Normal'}
+          </button>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            {showFilters ? 'Hide Filters' : 'Show Filters'}
+          </button>
+        </div>
       </div>
 
       {/* Filter Panel */}
@@ -140,9 +151,16 @@ export default function PokemonList({ favoritesOnly = false }: PokemonListProps)
         </div>
       ) : (
         <>
+          {/* Results count */}
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Showing {filteredPokemon.length} Pokémon
+            {filters.search && ` matching "${filters.search}"`}
+            {filters.types.length > 0 && ` with types: ${filters.types.join(', ')}`}
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {filteredPokemon.map((pokemon) => (
-              <PokemonCard key={pokemon.id} pokemon={pokemon} />
+              <PokemonCard key={pokemon.id} pokemon={pokemon} showShiny={showShiny} />
             ))}
           </div>
 
