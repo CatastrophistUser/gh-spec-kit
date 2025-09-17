@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  .pokemon-card {
+    @apply bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1;
+  }
+  
+  .type-badge {
+    @apply px-3 py-1 rounded-full text-white text-sm font-medium shadow-sm;
+  }
+  
+  .stat-bar {
+    @apply bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden;
+  }
+  
+  .stat-fill {
+    @apply h-full transition-all duration-500 ease-out;
+  }
+}
