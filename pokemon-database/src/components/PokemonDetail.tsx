@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { usePokemon, usePokemonSpecies } from '../hooks/usePokemon';
+import { usePokemon, usePokemonSpecies, useEvolutionChain } from '../hooks/usePokemon';
 import { useUserStore } from '../stores/userStore';
 import { pokeApiService } from '../services/pokeapi';
 import LoadingSpinner from './LoadingSpinner';
@@ -8,16 +8,21 @@ import ErrorMessage from './ErrorMessage';
 import StatChart from './StatChart';
 import StatBars from './StatBars';
 import MovesetDisplay from './MovesetDisplay';
-import { Heart, Star, ArrowLeft, Weight, Ruler, Users, Zap } from 'lucide-react';
+import EvolutionTree from './EvolutionTree';
+import { Heart, Star, ArrowLeft, ArrowRight, Weight, Ruler, Users, Zap } from 'lucide-react';
 
 export default function PokemonDetail() {
   const { id } = useParams<{ id: string }>();
   const { isFavorite, toggleFavorite } = useUserStore();
-  const [activeTab, setActiveTab] = useState<'stats' | 'moves' | 'info'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'moves' | 'evolution' | 'info'>('stats');
   const [showShiny, setShowShiny] = useState(false);
 
   const { data: pokemon, isLoading: pokemonLoading, error: pokemonError } = usePokemon(id!);
   const { data: species, isLoading: speciesLoading, error: speciesError } = usePokemonSpecies(id!);
+  // compute evolution chain id (0 if unknown) and call hook unconditionally to satisfy hooks rules
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const evolutionChainId = species && (species as any).evolution_chain ? pokeApiService.extractIdFromUrl((species as any).evolution_chain.url) : 0;
+  const { data: evolutionChain, isLoading: evolutionLoading, error: evolutionError } = useEvolutionChain(evolutionChainId as number);
 
   if (pokemonLoading || speciesLoading) {
     return <LoadingSpinner message="Loading Pokémon details..." />;
@@ -84,9 +89,10 @@ export default function PokemonDetail() {
   };
 
   const tabs = [
-    { id: 'stats', label: 'Stats', icon: Zap },
-    { id: 'moves', label: 'Moves', icon: Star },
-    { id: 'info', label: 'Info', icon: Users },
+    { id: 'stats' as const, label: 'Stats', icon: Zap },
+    { id: 'moves' as const, label: 'Moves', icon: Star },
+    { id: 'evolution' as const, label: 'Evolution', icon: ArrowRight },
+    { id: 'info' as const, label: 'Info', icon: Users },
   ];
 
   return (
@@ -222,7 +228,7 @@ export default function PokemonDetail() {
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
+                    onClick={() => setActiveTab(tab.id as 'stats' | 'moves' | 'evolution' | 'info')}
                     className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                       activeTab === tab.id
                         ? 'border-blue-500 text-blue-600 dark:text-blue-400'
@@ -256,6 +262,21 @@ export default function PokemonDetail() {
               <div>
                 <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Moves</h3>
                 <MovesetDisplay pokemon={pokemon} />
+              </div>
+            )}
+
+            {activeTab === 'evolution' && (
+              <div>
+                <h3 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Evolution</h3>
+                {evolutionLoading ? (
+                  <LoadingSpinner message="Loading evolution chain..." />
+                ) : evolutionError ? (
+                  <ErrorMessage message="Failed to load evolution chain" />
+                ) : evolutionChain ? (
+                  <EvolutionTree chain={evolutionChain} />
+                ) : (
+                  <div className="text-sm text-gray-500">No evolution data available.</div>
+                )}
               </div>
             )}
 

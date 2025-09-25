@@ -4,11 +4,13 @@
 
 @layer base {
   * {
-    @apply border-border;
+    /* Use a light border color by default; dark variant handled via Tailwind dark mode */
+    @apply border border-gray-200 dark:border-gray-700;
   }
-  
+
   body {
-    @apply bg-background text-foreground;
+    /* Use Tailwind background/text tokens directly to ensure they exist */
+    @apply bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
